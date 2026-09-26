@@ -31,7 +31,7 @@ public interface IMemoryService
     void RunThread(nint address, uint timeout = uint.MaxValue);
 
     void AllocateAndExecute(byte[] shellcode);
-    void AllocCodeCave();
+    bool AllocCodeCave();
 
     nint AllocateMem(uint size);
     void FreeMem(nint addr);

@@ -229,7 +229,13 @@ namespace SilkySouls3
 
                 ct.ThrowIfCancellationRequested();
                 _memoryService.WriteBytes(Patches.NoLogo, AsmLoader.GetAsmBytes(AsmScript.NoLogo));
-                _memoryService.AllocCodeCave();
+                if (!_memoryService.AllocCodeCave())
+                {
+                    Console.WriteLine("AllocCodeCave failed: no free memory region found near the game module.");
+                    MsgBox.Show(
+                        "Couldn't allocate a memory region near the game process. Features that rely on custom code (item spawn, warps, cinder controls, no-clip, and other patches) will not work correctly, though basic features should still work. This can happen under Proton/Wine.",
+                        "Attach Warning");
+                }
                 _stateService.Publish(State.Attached);
 
 #if DEBUG

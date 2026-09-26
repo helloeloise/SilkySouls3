@@ -29,9 +29,13 @@ public class MemoryService : IMemoryService
     private const uint MemRelease = 0x00008000;
         
     private const uint CodeCaveSize = 0x5000;
-    private const int CodeCaveSearchStart = 0x40000000;
-    private const int CodeCaveSearchEnd = 0x30000;
-    private const int CodeCaveSearchStep = 0x10000;
+
+    // Max distance a 32-bit relative jmp (used by HookManager) can reach from the module base.
+    private const long CodeCaveSearchRadius = 0x40000000;
+
+    // Stay clear of the module itself.
+    private const long CodeCaveSearchMinOffset = 0x30000;
+    private const long CodeCaveSearchStep = 0x10000;
 
     private const string ProcessName = "darksoulsiii";
     private bool _disposed;
@@ -198,21 +202,27 @@ public class MemoryService : IMemoryService
         Kernel32.VirtualFreeEx(ProcessHandle, allocatedMemory, 0, MemRelease);
     }
 
-    public void AllocCodeCave()
+    // Searches both below and above the module base, since address space that's free on native
+    // Windows (the original below-base-only search range) is often already occupied by Wine's own
+    // internal mappings when running under Proton, causing the search to find nothing there.
+    public bool AllocCodeCave()
     {
-        nint searchRangeStart = BaseAddress - CodeCaveSearchStart;
-        nint searchRangeEnd = BaseAddress - CodeCaveSearchEnd;
-
-        for (nint addr = searchRangeEnd; addr > searchRangeStart; addr -= CodeCaveSearchStep)
+        for (long offset = CodeCaveSearchMinOffset; offset < CodeCaveSearchRadius; offset += CodeCaveSearchStep)
         {
-            var allocatedMemory = Kernel32.VirtualAllocEx(ProcessHandle, addr, CodeCaveSize);
-
-            if (allocatedMemory != IntPtr.Zero)
-            {
-                CustomCodeOffsets.Base = allocatedMemory;
-                break;
-            }
+            if (TryAllocCodeCaveAt(BaseAddress - (nint)offset)) return true;
+            if (TryAllocCodeCaveAt(BaseAddress + (nint)offset)) return true;
         }
+
+        return false;
+    }
+
+    private bool TryAllocCodeCaveAt(nint addr)
+    {
+        var allocatedMemory = Kernel32.VirtualAllocEx(ProcessHandle, addr, CodeCaveSize);
+        if (allocatedMemory == IntPtr.Zero) return false;
+
+        CustomCodeOffsets.Base = allocatedMemory;
+        return true;
     }
 
     public nint AllocateMem(uint size) => Kernel32.VirtualAllocEx(ProcessHandle, IntPtr.Zero, size);

@@ -24,6 +24,12 @@ public class MemoryService : IMemoryService
     private const int ProcessVmWrite = 0x0020;
     private const int ProcessVmOperation = 0x0008;
     private const int ProcessQueryInformation = 0x0400;
+
+    // Real Windows tolerates CreateRemoteThread without this right explicitly granted, but
+    // Wine enforces the access check correctly per the documented contract and denies it,
+    // silently breaking every ASM-injection feature (warps, sp effects, EzState menus, etc.)
+    // while plain ReadProcessMemory/WriteProcessMemory keep working fine.
+    private const int ProcessCreateThread = 0x0002;
     private const int AttachCheckInterval = 2000; //MS
 
     private const uint MemRelease = 0x00008000;
@@ -259,7 +265,7 @@ public class MemoryService : IMemoryService
             {
                 TargetProcess = processes[0];
                 ProcessHandle = Kernel32.OpenProcess(
-                    ProcessVmRead | ProcessVmWrite | ProcessVmOperation | ProcessQueryInformation,
+                    ProcessVmRead | ProcessVmWrite | ProcessVmOperation | ProcessQueryInformation | ProcessCreateThread,
                     false,
                     TargetProcess.Id);
 
